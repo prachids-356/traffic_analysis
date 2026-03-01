@@ -162,20 +162,19 @@ def _pipeline() -> None:
             objects, new_counts = tracker.update(detections)
 
             # 2b. Update tracking telemetry: speed + lanes + wrong-way
-            half_speed = SPEED_LIMIT_KMH / 2
-            dist  = {f"0-{int(half_speed)}": 0, f"{int(half_speed)}-{int(SPEED_LIMIT_KMH)}": 0, f"{int(SPEED_LIMIT_KMH)}+": 0}
+            dist  = {"0-30": 0, "30-60": 0, "60+": 0}
             lcounts = {"L1": 0, "L2": 0, "L3": 0}
             new_violations = 0
             new_wrong_way  = 0
             for obj in objects.values():
                 # Speed distribution
                 s = obj.speed_kmh
-                if s < half_speed:
-                    dist[f"0-{int(half_speed)}"] += 1
-                elif s < SPEED_LIMIT_KMH:
-                    dist[f"{int(half_speed)}-{int(SPEED_LIMIT_KMH)}"] += 1
+                if s < 30:
+                    dist["0-30"] += 1
+                elif s < 60:
+                    dist["30-60"] += 1
                 else:
-                    dist[f"{int(SPEED_LIMIT_KMH)}+"] += 1
+                    dist["60+"] += 1
                     if not obj.violated:
                         obj.violated = True
                         new_violations += 1
@@ -289,11 +288,12 @@ def _pipeline() -> None:
                 history_for_spike = list(_state["count_history"])
             vpm = metrics.get("vehicles_per_min", 0.0)
             
-            # Use explicit list for slicing to satisfy linter
-            recent_spike_history = history_for_spike[-10:] if len(history_for_spike) >= 10 else history_for_spike
+            # Use explicit list for slicing to satisfy linter and prevent errors
             avg_vpm = 0.0
-            if recent_spike_history:
-                avg_vpm = vehicles_per_minute(history_for_spike[:-1][-10:]) if len(history_for_spike) > 1 else 0.0
+            if len(history_for_spike) > 1:
+                # Compare current VPM to recent average (last 10 events excluding latest)
+                recent_segment = history_for_spike[-11:-1]
+                avg_vpm = vehicles_per_minute(recent_segment) if recent_segment else 0.0
 
             if vpm > avg_vpm * 2 and vpm > 5 and time.time() - _last_spike_time > 60:
                 _last_spike_time = time.time()
