@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 _EFFECTIVE_FPS: float = VIDEO_FPS / max(1, FRAME_SKIP)
 
-DISTANCE_THRESHOLD: int = 80
-MAX_DISAPPEARED: int = 30
+DISTANCE_THRESHOLD: int = 40
+MAX_DISAPPEARED: int = 15
 SPEED_EMA_ALPHA: float = 0.3
 MAX_SPEED_KMH: float = 200.0
 
