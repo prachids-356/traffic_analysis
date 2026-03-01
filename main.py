@@ -50,26 +50,31 @@ async def error_handling_middleware(request, call_next):
 # ── Static / dashboard ────────────────────────────────────────────────────────
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
-
 @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
 async def serve_dashboard():
     """Serve the main dashboard HTML page."""
     index = TEMPLATES_DIR / "dashboard.html"
+    if not index.exists():
+        return {"error": "Dashboard template not found"}, 404
     return FileResponse(str(index), media_type="text/html")
 
+@app.api_route("/healthz", methods=["GET", "HEAD"])
+async def healthz():
+    """Explicit health check for Render."""
+    return {"status": "ok"}
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting background detection pipeline …")
     traffic_service.start_pipeline()
-    logger.info("FastAPI application ready.")
-
+    logger.info("FastAPI application ready and listening.")
 
 # ── Run ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    import os
+    # Render provides the PORT environment variable
     port = int(os.environ.get("PORT", 8000))
+    logger.info(f"Targeting port: {port}")
     uvicorn.run(
         "main:app",
         host="0.0.0.0",

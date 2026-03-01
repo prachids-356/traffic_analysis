@@ -30,5 +30,5 @@ EXPOSE 8000
 # Define environment variable
 ENV PYTHONUNBUFFERED=1
 
-# Run the application using the PORT environment variable
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Run the application using python directly to ensure our main.py logic executes
+CMD ["python", "main.py"]
