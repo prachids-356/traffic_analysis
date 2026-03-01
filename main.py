@@ -51,7 +51,7 @@ async def error_handling_middleware(request, call_next):
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
-@app.get("/", include_in_schema=False)
+@app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
 async def serve_dashboard():
     """Serve the main dashboard HTML page."""
     index = TEMPLATES_DIR / "dashboard.html"
