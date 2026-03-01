@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Traffic AI – Live Analytics Dashboard</title>
+    <meta name="description"
+        content="Real-time AI-powered vehicle detection, counting, and traffic density dashboard powered by YOLOv8 and FastAPI." />
+
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet" />
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: { 400: '#38bdf8', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1' },
+                        surf: { 900: '#090e1a', 800: '#0f1829', 700: '#172236', 600: '#1e2d46' },
+                    },
+                    animation: { 'pulse-slow': 'pulse 3s cubic-bezier(.4,0,.6,1) infinite' },
+                }
+            }
+        }
+    </script>
+
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #090e1a;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        /* ── Animated gradient top bar ── */
+        .top-bar {
+            height: 3px;
+            background: linear-gradient(90deg, #0ea5e9, #818cf8, #ec4899, #0ea5e9);
+            background-size: 300%;
+            animation: barFlow 6s linear infinite;
+        }
+
+        @keyframes barFlow {
+            to {
+                background-position: -300% center;
+            }
+        }
+
+        /* ── Glassmorphism card ── */
+        .card {
+            background: rgba(23, 34, 54, 0.8);
+            border: 1px solid rgba(56, 189, 248, 0.1);
+            border-radius: 18px;
+            backdrop-filter: blur(14px);
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 16px 48px rgba(14, 165, 233, 0.14);
+        }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar {
+            width: 5px;
+            background: #0f1829;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #1e2d46;
+            border-radius: 3px;
+        }
+
+        /* ── Density badge variants ── */
+        .badge {
+            display: inline-block;
+            border-radius: 10px;
+            padding: .25rem 1.1rem;
+            font-weight: 700;
+            font-size: 1.4rem;
+            letter-spacing: .05em;
+            transition: all .5s ease;
+        }
+
+        .badge-LOW {
+            background: #052e16;
+            color: #4ade80;
+            border: 1px solid #166534;
+        }
+
+        .badge-MEDIUM {
+            background: #431407;
+            color: #fb923c;
+            border: 1px solid #9a3412;
+        }
+
+        .badge-HIGH {
+            background: #450a0a;
+            color: #f87171;
+            border: 1px solid #991b1b;
+        }
+
+        /* ── Pulse dot ── */
+        .dot-live {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4ade80;
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(74, 222, 128, .6);
+            }
+
+            50% {
+                box-shadow: 0 0 0 6px rgba(74, 222, 128, 0);
+            }
+        }
+
+        /* ── Spinner ── */
+        .spin {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid rgba(56, 189, 248, .25);
+            border-top-color: #0ea5e9;
+            animation: spin .7s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ── Table rows ── */
+        tr.log-row:nth-child(even) {
+            background: rgba(30, 45, 70, .4);
+        }
+
+        tr.log-row:hover {
+            background: rgba(14, 165, 233, .07);
+        }
+
+        tr.log-row {
+            transition: background .15s;
+        }
+
+        /* ── Chart canvas height ── */
+        .chart-box {
+            position: relative;
+            height: 230px;
+        }
+
+        /* ── Progress bars ── */
+        .bar-fill {
+            height: 6px;
+            border-radius: 3px;
+            transition: width .7s ease;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Top accent bar -->
+    <div class="top-bar"></div>
+
+    <!-- ════════════════════════════════ NAVBAR ════════════════════════════════════ -->
+    <header class="sticky top-0 z-50 bg-surf-800/90 border-b border-slate-700/40 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-5 py-3 flex items-center justify-between">
+
+            <!-- Brand -->
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-brand-600 flex items-center justify-center
+                  shadow-lg shadow-brand-700/50 flex-shrink-0">
+                    <!-- car icon -->
+                    <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0M13 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0
+               M5 12l2-5h10l2 5M3 12h18" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-base font-bold text-white leading-none tracking-tight">Traffic AI</p>
+                    <p class="text-[11px] text-slate-400 leading-none mt-0.5">YOLOv8 · Real-time Analytics</p>
+                </div>
+            </div>
+
+            <!-- Right controls -->
+            <div class="flex items-center gap-3">
+                <!-- Live pill -->
+                <span class="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold
+                   bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                    <span class="dot-live"></span>LIVE
+                </span>
+
+                <!-- Swagger -->
+                <a href="/api/docs" target="_blank" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-600
+                text-slate-300 hover:border-brand-400 hover:text-brand-400 transition-colors">
+                    API Docs
+                </a>
+
+                <!-- Export CSV -->
+                <a id="csvBtn" href="/download-csv" class="flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-semibold
+                bg-brand-600 hover:bg-brand-500 text-white shadow-md shadow-brand-700/40
+                transition-all duration-200">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1
+               M12 12v6m0 0l-3-3m3 3l3-3M12 6V3" />
+                    </svg>
+                    Export CSV
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- ════════════════════════════════ MAIN ══════════════════════════════════════ -->
+    <main class="max-w-7xl mx-auto px-5 py-8 space-y-7">
+
+        <!-- ── KPI cards ──────────────────────────────────────────────────────────── -->
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+
+            <!-- Total count -->
+            <div class="card p-6">
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
+                    Live Vehicle Count
+                </p>
+                <div class="flex items-end gap-2">
+                    <span id="statCount" class="text-5xl font-extrabold text-white tabular-nums">—</span>
+                    <span class="text-slate-400 text-sm mb-1">vehicles</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-3">Total crossing virtual line</p>
+            </div>
+
+            <!-- Density -->
+            <div class="card p-6 flex flex-col gap-3">
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                    Traffic Density
+                </p>
+                <span id="statDensity" class="badge badge-LOW">—</span>
+                <p class="text-xs text-slate-500">LOW &lt;10 · MEDIUM &lt;25 · HIGH ≥25</p>
+            </div>
+
+            <!-- Vehicles/min -->
+            <div class="card p-6">
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
+                    Vehicles / Minute
+                </p>
+                <div class="flex items-end gap-2">
+                    <span id="statVpm" class="text-5xl font-extrabold text-brand-400 tabular-nums">—</span>
+                    <span class="text-slate-400 text-sm mb-1">veh/min</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-3">Rolling throughput estimate</p>
+            </div>
+
+        </section>
+
+        <!-- ── Charts ─────────────────────────────────────────────────────────────── -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+            <!-- Line chart: throughput over time -->
+            <div class="card p-6 lg:col-span-2">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold text-white">Throughput Over Time</h2>
+                    <span class="text-xs text-slate-500">Last 10 readings</span>
+                </div>
+                <div class="chart-box"><canvas id="lineChart"></canvas></div>
+            </div>
+
+            <!-- Doughnut chart: vehicle type distribution -->
+            <div class="card p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold text-white">Type Distribution</h2>
+                    <span class="text-xs text-slate-500">By vehicle class</span>
+                </div>
+                <div class="chart-box"><canvas id="pieChart"></canvas></div>
+            </div>
+
+        </section>
+
+        <!-- ── Per-type breakdown ──────────────────────────────────────────────────── -->
+        <section class="card p-6">
+            <h2 class="text-sm font-semibold text-white mb-5">Per-Type Breakdown</h2>
+            <div id="typeBreakdown" class="grid grid-cols-2 md:grid-cols-4 gap-6"></div>
+        </section>
+
+        <!-- ── Recent vehicle log table ─────────────────────────────────────────────── -->
+        <section class="card overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700/40">
+                <h2 class="text-sm font-semibold text-white">Recent Vehicle Logs</h2>
+                <div class="flex items-center gap-3 text-xs text-slate-400">
+                    <span id="tableSpinner" class="spin hidden"></span>
+                    Last 50 records
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider
+                     border-b border-slate-700/40">
+                            <th class="px-6 py-3 text-left">#</th>
+                            <th class="px-6 py-3 text-left">Timestamp</th>
+                            <th class="px-6 py-3 text-left">Type</th>
+                            <th class="px-6 py-3 text-left">Direction</th>
+                            <th class="px-6 py-3 text-left">Density</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logsBody">
+                        <tr>
+                            <td colspan="5" class="px-6 py-10 text-center text-slate-500 text-sm italic">
+                                Waiting for data …
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center text-xs text-slate-600 py-6 border-t border-slate-800 mt-4">
+        Traffic AI &copy; 2026 &nbsp;·&nbsp; YOLOv8n &nbsp;·&nbsp; FastAPI &nbsp;·&nbsp; SQLite
+    </footer>
+
+
+    <!-- ══════════════════════════════ JAVASCRIPT ══════════════════════════════════ -->
+    <script>
+        /* ─── Chart global defaults ──────────────────────────────────────────────── */
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.font.family = 'Inter';
+        Chart.defaults.font.size = 11;
+
+        const GRID = 'rgba(148,163,184,.07)';
+
+        const TYPE_CFG = {
+            car: { bg: 'rgba(56,189,248,.75)', border: '#0ea5e9', label: '🚗 Cars' },
+            motorcycle: { bg: 'rgba(167,139,250,.75)', border: '#7c3aed', label: '🏍 Motorcycles' },
+            bus: { bg: 'rgba(251,191,36,.75)', border: '#d97706', label: '🚌 Buses' },
+            truck: { bg: 'rgba(248,113,113,.75)', border: '#dc2626', label: '🚚 Trucks' },
+        };
+
+        /* ─── Line chart ─────────────────────────────────────────────────────────── */
+        const lineCtx = document.getElementById('lineChart').getContext('2d');
+        const lineChart = new Chart(lineCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'veh/min',
+                    data: [],
+                    borderColor: '#0ea5e9',
+                    backgroundColor: 'rgba(14,165,233,.1)',
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#0ea5e9',
+                    tension: 0.45,
+                    fill: true,
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: GRID }, ticks: { maxTicksLimit: 10 } },
+                    y: { grid: { color: GRID }, beginAtZero: true },
+                },
+            }
+        });
+
+        /* ─── Doughnut chart ─────────────────────────────────────────────────────── */
+        const pieCtx = document.getElementById('pieChart').getContext('2d');
+        const pieChart = new Chart(pieCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Cars', 'Motorcycles', 'Buses', 'Trucks'],
+                datasets: [{
+                    data: [0, 0, 0, 0],
+                    backgroundColor: Object.values(TYPE_CFG).map(c => c.bg),
+                    borderColor: Object.values(TYPE_CFG).map(c => c.border),
+                    borderWidth: 2,
+                    hoverOffset: 10,
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                cutout: '64%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 12, padding: 14, color: '#94a3b8' }
+                    }
+                }
+            }
+        });
+
+        /* ─── State ──────────────────────────────────────────────────────────────── */
+        const vpmHistory = [];
+        const MAX_VPM_PTS = 10;
+
+        /* ─── Helpers ────────────────────────────────────────────────────────────── */
+        function nowHMS() {
+            return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        function densityClass(d) {
+            return d === 'LOW' ? 'badge-LOW' : d === 'MEDIUM' ? 'badge-MEDIUM' : 'badge-HIGH';
+        }
+
+        function typeChip(t) {
+            const palette = {
+                car: 'bg-sky-500/10 text-sky-400 border-sky-500/30',
+                motorcycle: 'bg-violet-500/10 text-violet-400 border-violet-500/30',
+                bus: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+                truck: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+            };
+            const cls = palette[t] ?? 'bg-slate-500/10 text-slate-300 border-slate-500/30';
+            return `<span class="px-2 py-0.5 rounded-md text-xs font-medium border ${cls}">${t}</span>`;
+        }
+
+        function dirChip(dir) {
+            return dir === 'up'
+                ? '<span class="text-brand-400 font-medium">↑ Up</span>'
+                : '<span class="text-rose-400 font-medium">↓ Down</span>';
+        }
+
+        /* ─── Update KPIs ────────────────────────────────────────────────────────── */
+        function updateStats(data) {
+            const tb = data.type_breakdown ?? {};
+            const total = data.total_count ?? 0;
+            const vpm = data.vehicles_per_min ?? 0;
+            const dens = data.density ?? 'LOW';
+
+            // KPI numbers
+            document.getElementById('statCount').textContent = total;
+            document.getElementById('statVpm').textContent = vpm.toFixed(1);
+
+            // Density badge
+            const badge = document.getElementById('statDensity');
+            badge.textContent = dens;
+            badge.className = `badge ${densityClass(dens)}`;
+
+            // Line chart
+            vpmHistory.push({ label: nowHMS(), v: vpm });
+            if (vpmHistory.length > MAX_VPM_PTS) vpmHistory.shift();
+            lineChart.data.labels = vpmHistory.map(p => p.label);
+            lineChart.data.datasets[0].data = vpmHistory.map(p => p.v);
+            lineChart.update('none');
+
+            // Doughnut
+            pieChart.data.datasets[0].data = [
+                tb.car ?? 0, tb.motorcycle ?? 0, tb.bus ?? 0, tb.truck ?? 0,
+            ];
+            pieChart.update('none');
+
+            // Per-type bars
+            const cap = Math.max(1, total);
+            const types = Object.entries(TYPE_CFG);
+            document.getElementById('typeBreakdown').innerHTML = types.map(([key, cfg]) => {
+                const cnt = tb[key] ?? 0;
+                const pct = Math.round((cnt / cap) * 100);
+                return `
+      <div>
+        <div class="flex justify-between items-center mb-1.5">
+          <span class="text-sm text-slate-300">${cfg.label}</span>
+          <span class="text-sm font-semibold text-white">${cnt}</span>
+        </div>
+        <div class="h-1.5 rounded-full bg-slate-700/60 overflow-hidden">
+          <div class="bar-fill" style="width:${pct}%;background:${cfg.border}"></div>
+        </div>
+        <p class="text-xs text-slate-500 mt-1">${pct}% of total</p>
+      </div>`;
+            }).join('');
+        }
+
+        /* ─── Update log table ───────────────────────────────────────────────────── */
+        function updateLogs(rows) {
+            const body = document.getElementById('logsBody');
+            if (!rows || !rows.length) {
+                body.innerHTML = `<tr><td colspan="5"
+      class="px-6 py-10 text-center text-slate-500 italic text-sm"
+      >No log entries yet.</td></tr>`;
+                return;
+            }
+            body.innerHTML = rows.map(r => `
+    <tr class="log-row border-b border-slate-700/25">
+      <td class="px-6 py-3 text-slate-500 text-xs">${r.id ?? '–'}</td>
+      <td class="px-6 py-3 text-slate-300 text-xs font-mono">${r.timestamp ?? '–'}</td>
+      <td class="px-6 py-3">${typeChip(r.vehicle_type)}</td>
+      <td class="px-6 py-3 text-xs">${dirChip(r.direction)}</td>
+      <td class="px-6 py-3">
+        <span class="badge text-xs py-0.5 px-2 ${densityClass(r.density)}"
+              style="font-size:.75rem">${r.density}</span>
+      </td>
+    </tr>`).join('');
+        }
+
+        /* ─── Polling ────────────────────────────────────────────────────────────── */
+        async function fetchStats() {
+            try {
+                const r = await fetch('/stats');
+                updateStats(await r.json());
+            } catch (_) { /* server not ready yet */ }
+        }
+
+        async function fetchVehicles() {
+            const sp = document.getElementById('tableSpinner');
+            sp.classList.remove('hidden');
+            try {
+                const r = await fetch('/vehicles');
+                updateLogs(await r.json());
+            } catch (_) { } finally { sp.classList.add('hidden'); }
+        }
+
+        /* ─── Boot ───────────────────────────────────────────────────────────────── */
+        fetchStats();
+        fetchVehicles();
+        setInterval(fetchStats, 3_000);
+        setInterval(fetchVehicles, 5_000);
+    </script>
+
+</body>
+
+</html>

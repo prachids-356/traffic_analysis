@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Traffic Analysis System – Live Dashboard</title>
+  <meta name="description" content="Real-time AI-powered vehicle detection and traffic density monitoring dashboard." />
+
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+            },
+            surface: {
+              900: '#0b0f19',
+              800: '#111827',
+              700: '#1a2237',
+              600: '#1f2d45',
+              500: '#263352',
+            },
+          },
+        }
+      }
+    }
+  </script>
+
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background: #0b0f19;
+      font-family: 'Inter', sans-serif;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      background: #111827;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #263352;
+      border-radius: 3px;
+    }
+
+    /* Animated gradient top bar */
+    .top-accent {
+      height: 3px;
+      background: linear-gradient(90deg, #0ea5e9, #6366f1, #ec4899, #0ea5e9);
+      background-size: 300% 100%;
+      animation: gradShift 5s linear infinite;
+    }
+
+    @keyframes gradShift {
+      0% {
+        background-position: 0% 50%;
+      }
+
+      100% {
+        background-position: 300% 50%;
+      }
+    }
+
+    /* Glass cards */
+    .glass {
+      background: rgba(26, 34, 55, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.12);
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .glass:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(14, 165, 233, 0.15);
+    }
+
+    /* Pulse ring on count */
+    .pulse-ring {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .6
+      }
+    }
+
+    /* Density badge colours */
+    .badge-LOW {
+      background: #052e16;
+      color: #4ade80;
+      border: 1px solid #166534;
+    }
+
+    .badge-MEDIUM {
+      background: #422006;
+      color: #fb923c;
+      border: 1px solid #9a3412;
+    }
+
+    .badge-HIGH {
+      background: #450a0a;
+      color: #f87171;
+      border: 1px solid #991b1b;
+    }
+
+    /* Table rows */
+    .log-row:nth-child(even) {
+      background: rgba(38, 51, 82, 0.35);
+    }
+
+    .log-row {
+      transition: background 0.15s;
+    }
+
+    .log-row:hover {
+      background: rgba(14, 165, 233, 0.08);
+    }
+
+    /* Spinner */
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(56, 189, 248, 0.3);
+      border-top-color: #0ea5e9;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* Chart canvas wrapper */
+    .chart-wrap {
+      position: relative;
+      height: 220px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Gradient top accent line -->
+  <div class="top-accent"></div>
+
+  <!-- ═══════════════════════════════ NAVBAR ═══════════════════════════════════ -->
+  <nav class="sticky top-0 z-50 border-b border-slate-700/50 bg-surface-800/90 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <!-- Logo icon -->
+        <div class="w-9 h-9 rounded-xl bg-brand-600 flex items-center justify-center shadow-lg shadow-brand-700/50">
+          <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M3 17v-2a4 4 0 014-4h10a4 4 0 014 4v2M7 17h10M5 10V7a2 2 0 012-2h10a2 2 0 012 2v3" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-base font-700 text-white tracking-tight leading-none">TrafficVision AI</h1>
+          <p class="text-xs text-slate-400 leading-none mt-0.5">Real-time Vehicle Analytics</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4 text-sm">
+        <!-- Traffic Health -->
+        <div class="hidden md:flex items-center gap-2 px-3 py-1 rounded-lg bg-surface-700 border border-slate-600">
+          <span class="text-xs text-slate-400 uppercase font-semibold">Health</span>
+          <span id="navHealth" class="font-bold text-emerald-400">100%</span>
+        </div>
+
+        <!-- Live indicator -->
+        <span id="livePill"
+          class="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-medium">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-ring"></span>
+          LIVE
+        </span>
+
+        <!-- Wrong-way alert badge (hidden until triggered) -->
+        <span id="wrongWayBadge" class="hidden flex items-center gap-2 px-3 py-1 rounded-full
+             bg-rose-500/20 border border-rose-500/50 text-rose-300 font-semibold text-xs animate-pulse">
+          ⚠ WRONG WAY &nbsp;<span id="wrongWayCount">0</span>
+        </span>
+
+        <!-- Heatmap toggle -->
+        <button id="heatmapBtn" onclick="toggleHeatmap()" class="flex items-center gap-2 px-4 py-1.5 rounded-lg border transition-all duration-200
+                 border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium">
+          <span id="heatmapIcon">&#127777;&#65039;</span>
+          <span id="heatmapLabel">Heatmap OFF</span>
+        </button>
+
+        <!-- Download button -->
+        <a id="csvBtn" href="/download-csv" class="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500
+               text-white font-medium transition-all duration-200 shadow-md shadow-brand-700/40">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v6m0 0l-3-3m3 3l3-3M12 6V3" />
+          </svg>
+          Export CSV
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════ MAIN ════════════════════════════════════ -->
+  <main class="max-w-7xl mx-auto px-4 py-8 space-y-8">
+
+    <!-- ── Live Video Feed ────────────────────────────────────────────────── -->
+    <section class="glass overflow-hidden" style="border:1px solid rgba(56,189,248,0.25)">
+      <div class="flex items-center justify-between px-6 py-3 border-b border-slate-700/50">
+        <h2 class="text-sm font-600 text-white">Live Camera Feed</h2>
+        <span class="flex items-center gap-2 text-xs text-slate-400">
+          YOLOv8 · Centroid Tracker
+        </span>
+      </div>
+      <div class="relative w-full" style="background:#000">
+        <!-- LIVE badge overlay -->
+        <div class="absolute top-3 left-3 z-10 flex items-center gap-1.5
+                  px-2.5 py-1 rounded-full text-xs font-semibold text-white
+                  bg-black/60 border border-red-500/60 backdrop-blur-sm">
+          <span class="w-2 h-2 rounded-full bg-red-500 pulse-ring"></span>
+          LIVE
+        </div>
+        <!-- Stream image -->
+        <img id="videoFeed" src="/video_feed" alt="Live traffic feed" class="w-full block"
+          style="max-height:520px; object-fit:contain; display:block;"
+          onerror="this.style.display='none'; document.getElementById('streamErr').style.display='flex';" />
+        <!-- Fallback when stream is unavailable -->
+        <div id="streamErr" class="hidden items-center justify-center text-slate-500 text-sm py-20"
+          style="background:#0b0f19">
+          ⚠ Video stream unavailable — check server logs
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Stat cards row ──────────────────────────────────────────────────── -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-5">
+
+      <!-- Live Vehicle Count -->
+      <div class="glass p-6" id="cardCount">
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Live Vehicle Count</p>
+        <div class="flex items-end gap-3">
+          <span id="statCount" class="text-5xl font-800 text-white pulse-ring">—</span>
+          <span class="text-slate-400 text-sm mb-1">vehicles</span>
+        </div>
+        <p class="text-xs text-slate-500 mt-3">Total crossing counting line</p>
+      </div>
+
+      <!-- Density Badge -->
+      <div class="glass p-6 flex flex-col justify-between" id="cardDensity">
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Traffic Density</p>
+        <div>
+          <span id="statDensity"
+            class="inline-block px-5 py-2 rounded-xl text-2xl font-700 badge-LOW transition-all duration-500">
+            —
+          </span>
+        </div>
+        <p class="text-xs text-slate-500 mt-3">LOW &lt;10 · MEDIUM &lt;25 · HIGH ≥25</p>
+      </div>
+
+      <!-- Vehicles / min -->
+      <div class="glass p-6" id="cardVpm">
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Vehicles / Minute</p>
+        <div class="flex items-end gap-3">
+          <span id="statVpm" class="text-5xl font-800 text-brand-400">—</span>
+          <span class="text-slate-400 text-sm mb-1">veh/min</span>
+        </div>
+        <p class="text-xs text-slate-500 mt-3">Rolling average throughput</p>
+      </div>
+
+      <!-- Currently Tracked -->
+      <div class="glass p-6" id="cardTracked">
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Currently Tracked</p>
+        <div class="flex items-end gap-3">
+          <span id="statTracked" class="text-5xl font-800 text-emerald-400">—</span>
+          <span class="text-slate-400 text-sm mb-1">vehicles</span>
+        </div>
+        <p class="text-xs text-slate-500 mt-3">Active in frame right now</p>
+      </div>
+
+      <!-- Speed Violations -->
+      <div class="glass p-6" id="cardViolations">
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Speed Violations</p>
+        <div class="flex items-end gap-3">
+          <span id="statViolations" class="text-5xl font-800 text-rose-400">—</span>
+          <span class="text-slate-400 text-sm mb-1">&gt;60</span>
+        </div>
+        <p class="text-xs text-slate-500 mt-3">Cumulative session total</p>
+      </div>
+
+      <!-- Model Reliability (Confidence) -->
+      <div class="glass p-6" id="cardConfidence">
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Model Reliability</p>
+        <div class="flex items-end gap-3">
+          <span id="statConfidence" class="text-5xl font-800 text-amber-400">—</span>
+          <span class="text-slate-400 text-sm mb-1">avg conf</span>
+        </div>
+        <p class="text-xs text-slate-500 mt-3">Mean detection confidence</p>
+      </div>
+
+    </section>
+
+    <!-- ── Advanced Analytics Row ────────────────────────────────────────── -->
+    <section class="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <!-- Risk Score -->
+      <div class="glass p-6 relative overflow-hidden">
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Traffic Risk Score</p>
+        <div class="flex items-center justify-between mb-2">
+          <span id="statRiskText" class="text-3xl font-800 text-white">0%</span>
+          <span class="text-xs text-rose-400 font-bold" id="riskLabel">NOMINAL</span>
+        </div>
+        <div class="w-full h-4 bg-slate-800 rounded-full overflow-hidden">
+          <div id="riskBar" class="h-full bg-gradient-to-r from-emerald-500 to-rose-500 transition-all duration-1000"
+            style="width: 0%"></div>
+        </div>
+        <p class="text-xs text-slate-500 mt-4">Based on density, violations & flow disruptions</p>
+      </div>
+
+      <!-- Health Gauge -->
+      <div class="glass p-6">
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Network Efficiency</p>
+        <div class="flex items-center gap-6">
+          <div class="relative w-20 h-20">
+            <svg class="w-full h-full" viewBox="0 0 36 36">
+              <path class="text-slate-800"
+                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none"
+                stroke="currentColor" stroke-width="3"></path>
+              <path id="healthCircle" class="text-emerald-500 transition-all duration-1000" stroke-dasharray="100, 100"
+                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none"
+                stroke="currentColor" stroke-width="3"></path>
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span id="statHealth" class="text-xl font-bold text-white">100%</span>
+            </div>
+          </div>
+          <div>
+            <p id="healthDesc" class="text-sm text-emerald-400 font-medium">Optimal Flow</p>
+            <p class="text-xs text-slate-500 mt-1">Real-time throughput index</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Lane Counts & Peak Hour row ────────────────────────────────────────── -->
+    <section class="grid grid-cols-1 md:grid-cols-4 gap-5">
+      <div class="glass p-5 md:col-span-3">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-600 text-white">Lane Traffic Breakdown</h2>
+          <span class="text-xs text-slate-500">Live vehicles per lane</span>
+        </div>
+        <div class="grid grid-cols-3 gap-4">
+          <!-- L1 – expected: right -->
+          <div class="rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-4 text-center">
+            <p class="text-xs font-semibold text-cyan-400 uppercase tracking-widest mb-1">Lane 1</p>
+            <p class="text-3xl font-800 text-white" id="laneL1">—</p>
+            <p class="text-[10px] text-slate-500 mt-1">&#8594; Flow: right</p>
+          </div>
+          <!-- L2 – expected: any (intersection) -->
+          <div class="rounded-xl border border-orange-500/30 bg-orange-500/5 p-4 text-center">
+            <p class="text-xs font-semibold text-orange-400 uppercase tracking-widest mb-1">Lane 2</p>
+            <p class="text-3xl font-800 text-white" id="laneL2">—</p>
+            <p class="text-[10px] text-slate-500 mt-1">&#8596; Intersection</p>
+          </div>
+          <!-- L3 – expected: left -->
+          <div class="rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-4 text-center">
+            <p class="text-xs font-semibold text-cyan-400 uppercase tracking-widest mb-1">Lane 3</p>
+            <p class="text-3xl font-800 text-white" id="laneL3">—</p>
+            <p class="text-[10px] text-slate-500 mt-1">&#8592; Flow: left</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass p-5 flex flex-col justify-center text-center relative overflow-hidden">
+        <div class="absolute -right-4 -top-4 w-20 h-20 bg-brand-500/10 rounded-full blur-2xl"></div>
+        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Peak Window</p>
+        <p id="peakHour" class="text-lg font-bold text-brand-400">Loading...</p>
+        <p class="text-[10px] text-slate-500 mt-1">Hourly density max</p>
+      </div>
+
+      <!-- Video Upload Card -->
+      <div class="glass p-5 flex flex-col justify-center">
+        <p class="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-2 text-center">Upload New Video</p>
+        <div class="flex flex-col gap-2">
+          <input type="file" id="videoInput" class="hidden" accept="video/*" onchange="handleFileUpload(this)">
+          <button onclick="document.getElementById('videoInput').click()"
+            class="w-full py-1.5 px-3 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg text-xs font-semibold text-slate-300 transition-all flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v6m0 0l-3-3m3 3l3-3M12 6V3" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            Upload File
+          </button>
+          <button onclick="switchCamera()"
+            class="w-full py-1.5 px-3 bg-brand-600/20 hover:bg-brand-600/30 border border-brand-500/30 rounded-lg text-xs font-semibold text-brand-400 transition-all flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            Use Webcam
+          </button>
+          <p id="uploadStatus" class="text-[8px] text-center text-slate-500 mt-0.5">Supports any video source</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Charts row ─────────────────────────────────────────────────────── -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+      <!-- Line chart – vehicles/min over time (2/3 width) -->
+      <div class="glass p-6 lg:col-span-2">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-600 text-white">Throughput Over Time</h2>
+          <span class="text-xs text-slate-500">Last 10 readings</span>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="lineChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Pie chart – type distribution -->
+      <div class="glass p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-600 text-white">Vehicle Types</h2>
+          <span class="text-xs text-slate-500">Distribution</span>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="pieChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Speed Distribution bar chart -->
+      <div class="glass p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-600 text-white">Speed Distribution</h2>
+          <span class="text-xs text-slate-500">km/h buckets</span>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="speedChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Directional Flow Chart -->
+      <div class="glass p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-600 text-white">Flow Analysis</h2>
+          <span class="text-xs text-slate-500">Up vs Down</span>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="flowChart"></canvas>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ── Type breakdown mini-bars ───────────────────────────────────────── -->
+    <section class="glass p-6">
+      <h2 class="text-sm font-600 text-white mb-5">Per-Type Breakdown</h2>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-6" id="typeBreakdown">
+        <!-- populated by JS -->
+      </div>
+    </section>
+
+    <!-- ── Alerts & Logs Row ──────────────────────────────────────────────── -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <!-- Smart Alerts Panel -->
+      <div class="glass overflow-hidden flex flex-col">
+        <div class="px-6 py-4 border-b border-slate-700/50 flex items-center justify-between bg-rose-500/5">
+          <h2 class="text-sm font-600 text-rose-400 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+            Active Alerts
+          </h2>
+        </div>
+        <div id="alertsPanel" class="flex-1 overflow-y-auto max-h-[400px] p-4 space-y-3">
+          <p class="text-center text-slate-500 text-xs py-10">Searching for anomalies...</p>
+        </div>
+      </div>
+
+      <!-- License Plate (AR) Log -->
+      <div class="glass overflow-hidden flex flex-col">
+        <div class="px-6 py-4 border-b border-slate-700/50 flex items-center justify-between bg-amber-500/5">
+          <h2 class="text-sm font-600 text-amber-400 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+            License Plate (AR) Log
+          </h2>
+          <span class="text-[10px] text-slate-500 uppercase font-bold tracking-widest">OCR Feed</span>
+        </div>
+        <div id="plateList" class="flex-1 overflow-y-auto max-h-[400px] p-4 divide-y divide-slate-700/40">
+          <p class="text-center text-slate-500 text-xs py-10">Identifying plates...</p>
+        </div>
+      </div>
+
+      <!-- Recent logs table (1/3 width now) -->
+      <div class="glass overflow-hidden">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700/50">
+          <h2 class="text-sm font-600 text-white">Recent Vehicle Logs</h2>
+          <span class="flex items-center gap-2 text-xs text-slate-400">
+            <span id="tableSpinner" class="spinner hidden"></span>
+            Last 50 records
+          </span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs text-slate-400 uppercase tracking-wider border-b border-slate-700/50">
+                <th class="px-6 py-3 text-left">#</th>
+                <th class="px-6 py-3 text-left">Timestamp</th>
+                <th class="px-6 py-3 text-left">Type</th>
+                <th class="px-6 py-3 text-left">Direction</th>
+                <th class="px-6 py-3 text-left">Density</th>
+              </tr>
+            </thead>
+            <tbody id="logsBody">
+              <tr>
+                <td colspan="5" class="px-6 py-8 text-center text-slate-500 text-sm">
+                  Waiting for data…
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="text-center text-xs text-slate-600 py-6">
+    TrafficVision AI © 2026 · Powered by YOLOv8 + FastAPI
+  </footer>
+
+  <!-- ═══════════════════════════════ SCRIPTS ══════════════════════════════════ -->
+  <script>
+    /* ─────────────────────────────────────────────────────────────────────────────
+       Chart setup
+    ───────────────────────────────────────────────────────────────────────────── */
+    const chartDefaults = {
+      color: '#94a3b8',
+      font: { family: 'Inter', size: 11 },
+    };
+    Chart.defaults.color = chartDefaults.color;
+    Chart.defaults.font = chartDefaults.font;
+
+    const GRID_COLOR = 'rgba(148,163,184,0.08)';
+    const TYPE_COLORS = {
+      car: 'rgba(56,189,248,0.85)',
+      motorcycle: 'rgba(167,139,250,0.85)',
+      bus: 'rgba(251,191,36,0.85)',
+      truck: 'rgba(248,113,113,0.85)',
+    };
+    const TYPE_BORDER = {
+      car: '#0ea5e9',
+      motorcycle: '#7c3aed',
+      bus: '#d97706',
+      truck: '#dc2626',
+    };
+
+    /* ── Line chart ────────────────────────────────────────────────────────────── */
+    const lineCtx = document.getElementById('lineChart').getContext('2d');
+    const lineChart = new Chart(lineCtx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Vehicles/min',
+          data: [],
+          borderColor: '#0ea5e9',
+          backgroundColor: 'rgba(14,165,233,0.10)',
+          borderWidth: 2,
+          pointRadius: 4,
+          pointBackgroundColor: '#0ea5e9',
+          tension: 0.4,
+          fill: true,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { mode: 'index' } },
+        scales: {
+          x: { grid: { color: GRID_COLOR }, ticks: { maxTicksLimit: 10 } },
+          y: { grid: { color: GRID_COLOR }, beginAtZero: true },
+        },
+      }
+    });
+
+    /* ── Pie chart ─────────────────────────────────────────────────────────────── */
+    const pieCtx = document.getElementById('pieChart').getContext('2d');
+    const pieChart = new Chart(pieCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Car', 'Motorcycle', 'Bus', 'Truck'],
+        datasets: [{
+          data: [0, 0, 0, 0],
+          backgroundColor: Object.values(TYPE_COLORS),
+          borderColor: Object.values(TYPE_BORDER),
+          borderWidth: 2,
+          hoverOffset: 8,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { boxWidth: 12, padding: 14, color: '#94a3b8' },
+          },
+        },
+        cutout: '62%',
+      }
+    });
+
+    /* ── Speed Distribution chart ──────────────────────────────────────────────── */
+    const speedCtx = document.getElementById('speedChart').getContext('2d');
+    const speedChart = new Chart(speedCtx, {
+      type: 'bar',
+      data: {
+        labels: ['0 – 30 km/h', '30 – 60 km/h', '60+ km/h'],
+        datasets: [{
+          label: 'Vehicles',
+          data: [0, 0, 0],
+          backgroundColor: [
+            'rgba(52,211,153,0.80)',   // green – slow
+            'rgba(251,191,36,0.80)',   // amber – moderate
+            'rgba(248,113,113,0.80)',  // red – speeding
+          ],
+          borderColor: ['#10b981', '#f59e0b', '#ef4444'],
+          borderWidth: 2,
+          borderRadius: 6,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: GRID_COLOR }, beginAtZero: true, ticks: { precision: 0 } },
+          y: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 } } },
+        },
+      }
+    });
+
+    /* ── Flow Chart (Directional) ────────────────────────────────────────────── */
+    const flowCtx = document.getElementById('flowChart').getContext('2d');
+    const flowChart = new Chart(flowCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Right Flow (L1)', 'Left Flow (L3)'],
+        datasets: [{
+          data: [0, 0],
+          backgroundColor: ['#22d3ee', '#f43f5e'],
+          borderWidth: 0,
+          hoverOffset: 10
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        cutout: '70%',
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, usePointStyle: true } }
+        }
+      }
+    });
+
+    /* ── Health Gauge Helper ─────────────────────────────────────────────────── */
+    function updateHealthGauge(percent) {
+      const circle = document.getElementById('healthCircle');
+      const text = document.getElementById('statHealth');
+      const navText = document.getElementById('navHealth');
+      const desc = document.getElementById('healthDesc');
+
+      const offset = 100 - percent;
+      circle.style.strokeDasharray = `${percent}, 100`;
+      text.textContent = `${percent}%`;
+      navText.textContent = `${percent}%`;
+
+      if (percent > 80) {
+        circle.setAttribute('class', 'text-emerald-500 transition-all duration-1000');
+        desc.textContent = 'Optimal Flow';
+        desc.className = 'text-sm text-emerald-400 font-medium';
+      } else if (percent > 50) {
+        circle.setAttribute('class', 'text-amber-500 transition-all duration-1000');
+        desc.textContent = 'Moderate Delay';
+        desc.className = 'text-sm text-amber-400 font-medium';
+      } else {
+        circle.setAttribute('class', 'text-rose-500 transition-all duration-1000');
+        desc.textContent = 'Congestion Likely';
+        desc.className = 'text-sm text-rose-400 font-medium';
+      }
+    }
+
+    function updateRiskScore(percent) {
+      const bar = document.getElementById('riskBar');
+      const text = document.getElementById('statRiskText');
+      const label = document.getElementById('riskLabel');
+
+      bar.style.width = `${percent}%`;
+      text.textContent = `${percent}%`;
+
+      if (percent < 30) {
+        label.textContent = 'NOMINAL';
+        label.className = 'text-xs text-emerald-400 font-bold';
+      } else if (percent < 70) {
+        label.textContent = 'ELEVATED';
+        label.className = 'text-xs text-amber-400 font-bold';
+      } else {
+        label.textContent = 'CRITICAL';
+        label.className = 'text-xs text-rose-400 font-bold';
+      }
+    }
+
+    /* ─────────────────────────────────────────────────────────────────────────────
+       State
+    ───────────────────────────────────────────────────────────────────────────── */
+    const vpmHistory = [];   // {label, value}[]
+    const MAX_HISTORY = 10;
+
+    /* ─────────────────────────────────────────────────────────────────────────────
+       Helpers
+    ───────────────────────────────────────────────────────────────────────────── */
+    function densityBadgeClass(d) {
+      if (d === 'LOW') return 'badge-LOW';
+      if (d === 'MEDIUM') return 'badge-MEDIUM';
+      return 'badge-HIGH';
+    }
+
+    function directionIcon(dir) {
+      return dir === 'up'
+        ? '<span class="text-brand-400">↑ Up</span>'
+        : '<span class="text-rose-400">↓ Down</span>';
+    }
+
+    function typeChip(t) {
+      const map = {
+        car: 'bg-sky-500/10 text-sky-400 border-sky-500/30',
+        motorcycle: 'bg-violet-500/10 text-violet-400 border-violet-500/30',
+        bus: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+        truck: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+      };
+      const cls = map[t] || 'bg-slate-500/10 text-slate-400';
+      return `<span class="px-2 py-0.5 rounded-md text-xs font-medium border ${cls}">${t}</span>`;
+    }
+
+    function nowLabel() {
+      return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    /* ─────────────────────────────────────────────────────────────────────────────
+       Update functions
+    ───────────────────────────────────────────────────────────────────────────── */
+    // Helper: force-reconnect the MJPEG stream so the browser picks up the new source
+    function reloadVideoFeed() {
+      const img = document.getElementById('videoFeed');
+      const base = '/video_feed';
+      img.style.display = 'block';
+      document.getElementById('streamErr').style.display = 'none';
+      // Append cache-busting param so the browser opens a fresh connection
+      img.src = base + '?t=' + Date.now();
+    }
+
+    function updateStats(data) {
+      // Metrics are nested under data.metrics; top-level fields are directly on data
+      const m = data.metrics ?? {};
+
+      // Count
+      document.getElementById('statCount').textContent = m.total_count ?? 0;
+
+      // Currently Tracked (top-level)
+      document.getElementById('statTracked').textContent = data.currently_tracked ?? 0;
+
+      // Speed Violations (top-level)
+      document.getElementById('statViolations').textContent = data.speed_violations ?? 0;
+
+      // Density badge
+      const densityEl = document.getElementById('statDensity');
+      const d = m.density ?? 'LOW';
+      densityEl.textContent = d;
+      densityEl.className = `inline-block px-5 py-2 rounded-xl text-2xl font-700 transition-all duration-500 ${densityBadgeClass(d)}`;
+
+      // Vehicles/min
+      document.getElementById('statVpm').textContent = (m.vehicles_per_min ?? 0).toFixed(1);
+
+      // Model Reliability – avg_confidence is inside metrics
+      const conf = m.avg_confidence ?? 0;
+      const confCard = document.getElementById('statConfidence');
+      confCard.textContent = (conf * 100).toFixed(0) + '%';
+      if (conf > 0.8) confCard.className = 'text-5xl font-800 text-emerald-400';
+      else if (conf > 0.5) confCard.className = 'text-5xl font-800 text-amber-400';
+      else confCard.className = 'text-5xl font-800 text-rose-400';
+
+      // Line chart
+      vpmHistory.push({ label: nowLabel(), value: m.vehicles_per_min ?? 0 });
+      if (vpmHistory.length > MAX_HISTORY) vpmHistory.shift();
+      lineChart.data.labels = vpmHistory.map(h => h.label);
+      lineChart.data.datasets[0].data = vpmHistory.map(h => h.value);
+      lineChart.update('none');
+
+      // Pie chart
+      const tb = m.type_breakdown ?? {};
+      pieChart.data.datasets[0].data = [
+        tb.car ?? 0, tb.motorcycle ?? 0, tb.bus ?? 0, tb.truck ?? 0,
+      ];
+      pieChart.update('none');
+
+      // Speed Distribution chart (top-level)
+      const sd = data.speed_distribution ?? {};
+      speedChart.data.datasets[0].data = [
+        sd['0-30'] ?? 0, sd['30-60'] ?? 0, sd['60+'] ?? 0,
+      ];
+      speedChart.update('none');
+
+      // Lane counts (top-level)
+      const lc = data.lane_counts ?? {};
+      document.getElementById('laneL1').textContent = lc['L1'] ?? 0;
+      document.getElementById('laneL2').textContent = lc['L2'] ?? 0;
+      document.getElementById('laneL3').textContent = lc['L3'] ?? 0;
+
+      // Peak Hour (top-level)
+      document.getElementById('peakHour').textContent = data.peak_hour ?? 'N/A';
+
+      // Flow Chart
+      const up = lc['L1'] ?? 0;
+      const down = (lc['L2'] ?? 0) + (lc['L3'] ?? 0);
+      flowChart.data.datasets[0].data = [up, down];
+      flowChart.update('none');
+
+      // Wrong-way alert badge (top-level)
+      const ww = data.wrong_way_alerts ?? 0;
+      const badge = document.getElementById('wrongWayBadge');
+      document.getElementById('wrongWayCount').textContent = ww;
+      badge.classList.toggle('hidden', ww === 0);
+
+      // Heatmap button sync (top-level)
+      updateHeatmapBtn(data.heatmap_enabled ?? false);
+
+      // Advanced Analytics
+      updateHealthGauge(m.health_score ?? 100);
+      updateRiskScore(m.risk_score ?? 0);
+
+      // Per-type breakdown bars
+      const container = document.getElementById('typeBreakdown');
+      const total = Math.max(1, m.total_count ?? 1);
+      const types = [
+        { key: 'car', label: 'Cars', icon: '🚗' },
+        { key: 'motorcycle', label: 'Motorcycles', icon: '🏍️' },
+        { key: 'bus', label: 'Buses', icon: '🚌' },
+        { key: 'truck', label: 'Trucks', icon: '🚚' },
+      ];
+      container.innerHTML = types.map(({ key, label, icon }) => {
+        const count = tb[key] ?? 0;
+        const pct = Math.round((count / total) * 100);
+        const clr = TYPE_BORDER[key];
+        return `
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-sm text-slate-300">${icon} ${label}</span>
+          <span class="text-sm font-600 text-white">${count}</span>
+        </div>
+        <div class="h-2 rounded-full bg-slate-700/60 overflow-hidden">
+          <div class="h-full rounded-full transition-all duration-700"
+               style="width:${pct}%; background:${clr}"></div>
+        </div>
+        <p class="text-xs text-slate-500 mt-1">${pct}% of total</p>
+      </div>`;
+      }).join('');
+    }
+
+    function updateLogs(rows) {
+      const body = document.getElementById('logsBody');
+      if (!rows || rows.length === 0) {
+        body.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-500">No data yet.</td></tr>`;
+        return;
+      }
+      body.innerHTML = rows.map(r => `
+    <tr class="log-row border-b border-slate-700/30">
+      <td class="px-6 py-3 text-slate-500 text-xs">${r.id}</td>
+      <td class="px-6 py-3 text-slate-300 text-xs font-mono">${r.timestamp ?? '—'}</td>
+      <td class="px-6 py-3">${typeChip(r.vehicle_type)}</td>
+      <td class="px-6 py-3 text-xs">${directionIcon(r.direction)}</td>
+      <td class="px-6 py-3">
+        <span class="px-2 py-0.5 rounded text-xs font-medium ${densityBadgeClass(r.density)}">${r.density}</span>
+      </td>
+    </tr>`).join('');
+    }
+
+    /* ─────────────────────────────────────────────────────────────────────────────
+       Polling
+    ───────────────────────────────────────────────────────────────────────────── */
+    async function fetchStats() {
+      try {
+        const res = await fetch('/stats');
+        const data = await res.json();
+        updateStats(data);
+      } catch (_) { }
+    }
+
+    async function fetchVehicles() {
+      const spinner = document.getElementById('tableSpinner');
+      spinner.classList.remove('hidden');
+      try {
+        const res = await fetch('/vehicles');
+        const rows = await res.json();
+        updateLogs(rows);
+      } catch (_) { } finally {
+        spinner.classList.add('hidden');
+      }
+    }
+
+    async function fetchAlerts() {
+      try {
+        const res = await fetch('/alerts');
+        const rows = await res.json();
+        const panel = document.getElementById('alertsPanel');
+        if (!rows || rows.length === 0) {
+          panel.innerHTML = `<p class="text-center text-slate-500 text-xs py-10">Searching for anomalies...</p>`;
+          return;
+        }
+        panel.innerHTML = rows.map(a => {
+          const sevClass = a.severity === 'CRITICAL' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' :
+            a.severity === 'MEDIUM' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+              'bg-blue-500/20 text-blue-400 border-blue-500/30';
+          return `
+            <div class="p-3 rounded-lg border bg-surface-700/50 border-slate-700/50">
+               <div class="flex items-center justify-between mb-1">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${sevClass}">${a.alert_type}</span>
+                  <span class="text-[10px] text-slate-500">${(a.timestamp || '').replace('T', ' ').split(' ')[1] || a.timestamp}</span>
+               </div>
+               <p class="text-xs text-slate-300">${a.description}</p>
+            </div>`;
+        }).join('');
+      } catch (_) { }
+    }
+
+    async function fetchPlates() {
+      try {
+        const res = await fetch('/plates');
+        const plates = await res.json();
+        const container = document.getElementById('plateList');
+        if (!plates || plates.length === 0) {
+          container.innerHTML = '<div class="p-8 text-center text-slate-500 text-xs italic">No plates identified yet.</div>';
+          return;
+        }
+        container.innerHTML = plates.map(p => {
+          return `
+            <div class="p-3 log-row flex items-center justify-between">
+              <div>
+                <p class="text-xs font-bold text-amber-400 tracking-wider">${p.plate_text}</p>
+                <p class="text-[9px] text-slate-500 uppercase">${p.vehicle_type} · ID ${p.track_id}</p>
+              </div>
+              <div class="text-right">
+                <p class="text-[10px] text-white font-medium">${Math.round((p.confidence || 0) * 100)}%</p>
+                <p class="text-[8px] text-slate-600">${(p.timestamp || '').split('T')[1]?.split('.')[0] || (p.timestamp || '').split(' ')[1] || p.timestamp}</p>
+              </div>
+            </div>`;
+        }).join('');
+      } catch (_) { }
+    }
+
+    async function handleFileUpload(input) {
+      const file = input.files[0];
+      if (!file) return;
+
+      const status = document.getElementById('uploadStatus');
+      status.innerText = "Uploading: " + file.name + "...";
+      status.classList.remove('text-slate-500');
+      status.classList.add('text-brand-400');
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          status.innerText = "Analyzing: " + data.filename;
+          status.classList.replace('text-brand-400', 'text-emerald-400');
+          // Give the backend ~1.5 s to restart the pipeline, then reload the stream
+          setTimeout(reloadVideoFeed, 1500);
+        } else {
+          status.innerText = "Upload failed.";
+          status.classList.replace('text-brand-400', 'text-rose-400');
+        }
+      } catch (e) {
+        status.innerText = "Error uploading.";
+        status.classList.replace('text-brand-400', 'text-rose-400');
+      }
+    }
+    async function switchCamera() {
+      const status = document.getElementById('uploadStatus');
+      status.innerText = "Switching to Camera...";
+      status.classList.remove('text-slate-500', 'text-rose-400', 'text-emerald-400');
+      status.classList.add('text-brand-400');
+      try {
+        const res = await fetch('/switch_camera', { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'success') {
+          status.innerText = "Source: Webcam (Camera 0)";
+          status.classList.replace('text-brand-400', 'text-emerald-400');
+          // Give backend time to open webcam, then reconnect stream
+          setTimeout(reloadVideoFeed, 1500);
+        } else {
+          status.innerText = "Camera switch failed.";
+          status.classList.replace('text-brand-400', 'text-rose-400');
+        }
+      } catch (e) {
+        status.innerText = "Error connecting to camera.";
+        status.classList.replace('text-brand-400', 'text-rose-400');
+      }
+    }
+
+    function updateHeatmapBtn(enabled) {
+      const btn = document.getElementById('heatmapBtn');
+      const lbl = document.getElementById('heatmapLabel');
+      if (enabled) {
+        lbl.textContent = 'Heatmap ON';
+        btn.classList.replace('border-slate-600', 'border-emerald-500');
+        btn.classList.replace('bg-slate-800', 'bg-emerald-500/10');
+        btn.classList.replace('text-slate-300', 'text-emerald-300');
+      } else {
+        lbl.textContent = 'Heatmap OFF';
+        btn.classList.replace('border-emerald-500', 'border-slate-600');
+        btn.classList.replace('bg-emerald-500/10', 'bg-slate-800');
+        btn.classList.replace('text-emerald-300', 'text-slate-300');
+      }
+    }
+
+    async function toggleHeatmap() {
+      try {
+        const res = await fetch('/toggle_heatmap', { method: 'POST' });
+        const data = await res.json();
+        updateHeatmapBtn(data.heatmap_enabled);
+      } catch (e) { console.error('Heatmap toggle failed', e); }
+    }
+
+    // ── Boot ───────────────────────────────────────────────────────────────────────
+    fetchStats();
+    fetchVehicles();
+    fetchPlates();
+    fetchAlerts();
+    setInterval(fetchStats, 3000);
+    setInterval(fetchVehicles, 5000);
+    setInterval(fetchPlates, 4000);
+    setInterval(fetchAlerts, 5000);
+  </script>
+
+</body>
+
+</html>
