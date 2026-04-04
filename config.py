@@ -14,7 +14,7 @@ RESIZE_WIDTH: int = 640     # optimized for CPU
 RESIZE_HEIGHT: int = 480
 YOLO_IMGSZ: int = 640       # inference image size for YOLO
 TRACK_ALL_CLASSES: bool = False # set to True to track any object
-PLATE_OCR_ENABLED: bool = True  # set to True for License Plate recognition
+PLATE_OCR_ENABLED: bool = os.getenv("PLATE_OCR_ENABLED", "False").lower() == "true"
 
 # ── Counting line ─────────────────────────────────────────────────────────────
 LINE_Y: int = 240            # y-position in 640x480 resized frame (middle)

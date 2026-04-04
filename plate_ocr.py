@@ -26,10 +26,14 @@ def _get_reader():
         if easyocr is None:
             logger.error("EasyOCR not installed. Run: pip install easyocr")
             return None
-        logger.info("Initializing EasyOCR reader (English) ...")
-        # Optimization: gpu=False for CPU-only systems or if you want to save VRAM
-        _reader = easyocr.Reader(['en'], gpu=False)
-        logger.info("EasyOCR initialized.")
+        try:
+            logger.info("Initializing EasyOCR reader (English) ...")
+            # Optimization: gpu=False for CPU-only systems or if you want to save VRAM
+            _reader = easyocr.Reader(['en'], gpu=False)
+            logger.info("EasyOCR initialized.")
+        except Exception as e:
+            logger.error("Failed to initialize EasyOCR (possibly OOM): %s", e)
+            _reader = None
     return _reader
 
 def recognize_plate(frame: np.ndarray, bbox: Tuple[int, int, int, int]) -> Tuple[Optional[str], float]:

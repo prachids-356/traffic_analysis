@@ -15,8 +15,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Optimize memory allocation for glibc
+ENV MALLOC_ARENA_MAX=2
+
 # Copy the requirements file into the container
 COPY requirements.txt .
+
+# Pre-install torch/torchvision (CPU version) to save significant memory/space
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
