@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="720" viewBox="0 0 1400 720">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1">
+      <stop offset="0%" stop-color="#020d1d"/>
+      <stop offset="100%" stop-color="#061a2d"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" x2="1">
+      <stop offset="0%" stop-color="#091d30"/>
+      <stop offset="100%" stop-color="#0d2032"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1400" height="720" fill="url(#bg)"/>
+  <rect x="30" y="25" width="1340" height="660" rx="18" fill="url(#panel)" stroke="#1c3554"/>
+  <text x="55" y="70" font-size="24" fill="#dfeeff" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Live Camera Feed</text>
+  <rect x="40" y="100" width="1320" height="560" rx="14" fill="#061319" stroke="#254768"/>
+
+  <g opacity="0.8">
+    <rect x="500" y="150" width="520" height="380" fill="#2a2a2a"/>
+    <path d="M 610 220 L 1010 220 L 1010 460 L 610 460 Z" fill="#7a7a7a" opacity="0.3"/>
+    <path d="M 500 280 L 1020 280" stroke="#e5e7eb" stroke-width="8" stroke-dasharray="20 18"/>
+    <path d="M 500 380 L 1020 380" stroke="#e5e7eb" stroke-width="8" stroke-dasharray="20 18"/>
+    <path d="M 700 150 L 700 530" stroke="#e5e7eb" stroke-width="8" stroke-dasharray="20 18"/>
+    <path d="M 850 150 L 850 530" stroke="#e5e7eb" stroke-width="8" stroke-dasharray="20 18"/>
+    <path d="M 500 150 L 1020 530" stroke="#e5e7eb" stroke-width="6" opacity="0.5"/>
+    <path d="M 1020 150 L 500 530" stroke="#e5e7eb" stroke-width="6" opacity="0.5"/>
+  </g>
+
+  <g>
+    <rect x="915" y="240" width="190" height="90" rx="14" fill="#0b1a28" stroke="#2fe2aa" stroke-width="3"/>
+    <text x="932" y="282" font-size="18" fill="#dfeeff" font-family="Segoe UI, Arial, sans-serif">Vehicle Count</text>
+    <text x="1058" y="282" font-size="14" fill="#2fe2aa" font-family="Segoe UI, Arial, sans-serif">12</text>
+    <text x="932" y="308" font-size="22" fill="#dfeeff" font-family="Segoe UI, Arial, sans-serif">4 vehicles</text>
+  </g>
+
+  <g>
+    <rect x="267" y="332" width="180" height="120" rx="12" fill="#0d1f35" stroke="#38bdf8" stroke-width="3"/>
+    <text x="290" y="375" font-size="18" fill="#dfeeff" font-family="Segoe UI, Arial, sans-serif">Speed</text>
+    <text x="290" y="408" font-size="30" fill="#7dd3fc" font-family="Segoe UI, Arial, sans-serif">67.2</text>
+    <text x="360" y="408" font-size="18" fill="#7dd3fc" font-family="Segoe UI, Arial, sans-serif">km/h</text>
+  </g>
+
+  <g>
+    <circle cx="760" cy="330" r="64" fill="none" stroke="#2dd4bf" stroke-width="10" opacity="0.9"/>
+    <circle cx="760" cy="330" r="40" fill="none" stroke="#09253e" stroke-width="8"/>
+    <circle cx="760" cy="330" r="14" fill="#2dd4bf"/>
+  </g>
+
+  <g>
+    <rect x="290" y="520" width="780" height="60" rx="10" fill="#111d2d" opacity="0.9"/>
+    <text x="330" y="558" font-size="22" fill="#dfeeff" font-family="Segoe UI, Arial, sans-serif">Current lane activity</text>
+  </g>
+</svg>
